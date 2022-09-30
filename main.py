@@ -1,13 +1,19 @@
 import re
 import numpy as np
 
-
 with open('data.txt', 'r') as file:
     data = file.read()
-data = re.sub('\n', ' ', data)
-data = re.sub('-', '', data)
 
-word_list = re.split(" ", data)
+data = data.lower()
+data = re.sub('\n', ' ', data)
+data = re.sub('\W', ' ', data)
+data = re.sub('\d', ' ', data)
+
+word_list = list(filter(None, re.split(' ', data)))
+
+print(word_list)
+print(len(word_list))
+
 character_list = []
 env_list = []  # the environment list contains all environments that occur in the data including duplicates
 
@@ -23,10 +29,10 @@ for x in word_list:
 character_list = list(set(character_list))
 
 total_env = []  # the environment set is all possible environments given the character list
-
+# total_env = [[f"_{x}", f"_{x}"] for x in character_list]
 for x in character_list:
-    total_env.append('_' + x)
-    total_env.append(x + '_')
+    total_env.append(f'_{x}')
+    total_env.append(f'{x}_')
 
 env_dict = {}
 for b in character_list:
@@ -48,14 +54,21 @@ for a in env_dict:
     count_list.append(list)
 count_matrix = np.array(count_list)
 
-prob_matrix = count_matrix / len(env_list)
+def normal(M):
 
-env_prob = np.expand_dims([sum([row[i] for row in prob_matrix]) for i in range(0,len(prob_matrix[0]))], axis=1)
+    prob_matrix = M / len(env_list)
 
-character_prob = np.expand_dims([sum(row) for row in prob_matrix], axis=0)
+    env_prob = np.expand_dims([sum([row[i] for row in prob_matrix]) for i in range(0,len(prob_matrix[0]))], axis=1)
 
-ind_prob_matrix = (np.matmul(env_prob, character_prob)).T
+    character_prob = np.expand_dims([sum(row) for row in prob_matrix], axis=0)
 
-normal_matrix = prob_matrix / ind_prob_matrix
+    ind_prob_matrix = (np.matmul(env_prob, character_prob)).T
+
+    return prob_matrix / ind_prob_matrix
+
+
+normal_matrix = normal(count_matrix)
 
 print(normal_matrix)
+print(character_list)
+print(total_env)
