@@ -2,10 +2,8 @@ import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import sklearn
 
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 from sklearn import metrics
 from sklearn.model_selection import ParameterGrid
 from sklearn.cluster import KMeans
@@ -22,8 +20,8 @@ data = re.sub('\d', ' ', data)
 
 word_list = list(filter(None, re.split(' ', data)))
 
-for count, str in enumerate(word_list):
-    word_list[count] = f'#{str}#'
+for count, string in enumerate(word_list):
+    word_list[count] = f'#{string}#'
 
 character_list = []
 env_list = []  # the environment list contains all environments that occur in the data including duplicates
@@ -76,7 +74,7 @@ normal_matrix = ((count_matrix / len(env_list))
                               np.expand_dims([sum(row) for row in count_matrix / len(env_list)], axis=0)))
                  .T)
 
-df = pd.DataFrame(normal_matrix, columns = total_env, index = character_list)
+df = pd.DataFrame(normal_matrix, columns=total_env, index=character_list)
 print(df)
 
 pca_2 = PCA(n_components=2)
@@ -85,10 +83,39 @@ pca_2_result = pca_2.fit_transform(normal_matrix)
 pca_df = pd.DataFrame(abs(pca_2.components_), columns=total_env, index=['pca1', 'pca2'])
 print(pca_df)
 
-kmeans = KMeans(n_clusters=2)
-kmeans.fit(normal_matrix)
-centroids = kmeans.cluster_centers_
-centroids_pca = pca_2.transform(centroids)
+def kmean_hyper_param_tuning(data):
+    """
+    Hyperparameter tuning to select the best from all the parameters on the basis of silhouette_score.
+    param data: dimensionality reduced data after applying PCA
+    :return: best number of clusters for the model (used for KMeans n_clusters)
+    """
+    # candidate values for our number of cluster
+    parameters = [2, 3, 4, 5, 10]
+
+    # instantiating ParameterGrid, pass number of clusters as input
+    parameter_grid = ParameterGrid({'n_clusters': parameters})
+
+    best_score = -1
+    kmeans_model = KMeans()     # instantiating KMeans model
+    silhouette_scores = []
+
+    # evaluation based on silhouette_score
+    for p in parameter_grid:
+        kmeans_model.set_params(**p)    # set current hyper parameter
+        kmeans_model.fit(data)          # fit model on wine dataset, this will find clusters based on parameter p
+
+        ss = metrics.silhouette_score(data, kmeans_model.labels_)   # calculate silhouette_score
+        silhouette_scores += [ss]       # store all the scores
+
+        print('Parameter:', p, 'Score', ss)
+
+        # check p which has the best score
+        if ss > best_score:
+            best_score = ss
+            best_grid = p
+
+    return best_grid['n_clusters']
+
 
 def visualizing_results(pca_result, label, centroids_pca):
     """ Visualizing the clusters
@@ -104,10 +131,20 @@ def visualizing_results(pca_result, label, centroids_pca):
     plt.title('Featural classes')
     plt.xlabel('PCA 1')
     plt.ylabel('PCA 2')
+    for i, txt in enumerate(character_list):
+        plt.annotate(txt, (x[i], y[i]))
 
-    plt.scatter(centroids_pca[:, 0], centroids_pca[:, 1], marker='X', s=200, linewidths=1.5,
-                color='red', edgecolors="black", lw=1.5)
+    plt.scatter(centroids_pca[:, 0], centroids_pca[:, 1], marker='X', s=200, linewidths=0.5,
+                color='red', edgecolors="black", lw=0.5)
 
     plt.show()
+
+
+optimum_clusters = kmean_hyper_param_tuning(normal_matrix)
+
+kmeans = KMeans(n_clusters=optimum_clusters)
+kmeans.fit(normal_matrix)
+centroids = kmeans.cluster_centers_
+centroids_pca = pca_2.transform(centroids)
 
 visualizing_results(pca_2_result, kmeans.labels_, centroids_pca)
